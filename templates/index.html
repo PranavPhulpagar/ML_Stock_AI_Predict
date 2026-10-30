@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Price Predictor — AI Agent</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body {
+            background: linear-gradient(135deg, #0a192f, #112240);
+            color: #fff; min-height: 100vh; display: flex;
+            align-items: flex-start; justify-content: center; padding: 40px 20px;
+        }
+        .container {
+            background: rgba(17, 34, 64, 0.85); backdrop-filter: blur(10px);
+            border: 1px solid #233554; padding: 40px 50px; border-radius: 20px;
+            box-shadow: 0 0 40px rgba(100, 255, 218, 0.2); text-align: center;
+            width: 480px; max-width: 100%;
+        }
+        h1 { font-size: 1.8rem; margin-bottom: 20px; color: #64ffda; letter-spacing: 1px; }
+        input {
+            width: 80%; padding: 12px; margin: 15px 0; border: none; outline: none;
+            border-radius: 10px; background: #233554; color: #fff; text-align: center; font-size: 1rem;
+        }
+        input::placeholder { color: #8fbcd4; }
+        button {
+            background: #64ffda; border: none; color: #0a192f; padding: 12px 30px;
+            border-radius: 10px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.3s;
+        }
+        button:hover { background: #52e3c2; transform: translateY(-2px); }
+        .result { margin-top: 25px; padding: 18px; border-radius: 10px; background: rgba(100,255,218,0.08); border: 1px solid #64ffda; text-align: left; animation: fadeIn 0.6s ease-in-out; }
+        .price { font-size: 1.8rem; color: #64ffda; font-weight: 600; margin: 6px 0; text-align: center; }
+        .move { text-align: center; font-size: 0.95rem; color: #8fbcd4; margin-bottom: 10px; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 12px; }
+        .badge.High { background: rgba(100,255,218,0.2); color: #64ffda; }
+        .badge.Medium { background: rgba(255,214,100,0.2); color: #ffd664; }
+        .badge.Low { background: rgba(255,100,100,0.2); color: #ff6464; }
+        .explanation { font-size: 0.9rem; line-height: 1.5; color: #e6f1ff; margin-top: 8px; }
+        .error { margin-top: 20px; padding: 14px; border-radius: 10px; background: rgba(255,100,100,0.1); border: 1px solid #ff6464; color: #ff9b9b; }
+        .chat-box { margin-top: 20px; text-align: left; }
+        .chat-log { max-height: 180px; overflow-y: auto; margin-bottom: 10px; font-size: 0.85rem; }
+        .chat-log .q { color: #64ffda; margin-top: 8px; }
+        .chat-log .a { color: #e6f1ff; margin-top: 2px; }
+        .chat-input-row { display: flex; gap: 8px; }
+        .chat-input-row input { width: 100%; margin: 0; }
+        .chat-input-row button { padding: 10px 18px; white-space: nowrap; }
+        footer { margin-top: 20px; font-size: 0.75rem; color: #8fbcd4; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Stock Price Predictor — AI Agent</h1>
+        <form method="POST">
+            <input type="text" name="symbol" placeholder="Enter Stock Symbol (e.g. AAPL)" required />
+            <br>
+            <button type="submit">Predict</button>
+        </form>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if result %}
+        <div class="result">
+            <div class="price">${{ "%.2f"|format(result.predicted_price) }}</div>
+            <div class="move">
+                {{ result.symbol }} · current ${{ "%.2f"|format(result.current_price) }}
+                · {{ "%+.2f"|format(result.confidence.pct_move) }}% move · band ±${{ result.confidence.band }}
+            </div>
+            <div style="text-align:center;">
+                <span class="badge {{ result.confidence.label }}">{{ result.confidence.label }} Confidence</span>
+            </div>
+            <div class="explanation">{{ result.explanation }}</div>
+
+            <div class="chat-box">
+                <div class="chat-log" id="chatLog"></div>
+                <div class="chat-input-row">
+                    <input type="text" id="chatInput" placeholder="Ask about this prediction..." />
+                    <button type="button" onclick="askFollowup()">Ask</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <footer>LSTM prediction + AI explanation layer. Not financial advice.</footer>
+    </div>
+
+    <script>
+        async function askFollowup() {
+            const input = document.getElementById('chatInput');
+            const question = input.value.trim();
+            if (!question) return;
+            const log = document.getElementById('chatLog');
+
+            const qLine = document.createElement('div');
+            qLine.className = 'q';
+            qLine.textContent = 'You: ' + question;
+            log.appendChild(qLine);
+            input.value = '';
+            log.scrollTop = log.scrollHeight;
+
+            const aLine = document.createElement('div');
+            aLine.className = 'a';
+            aLine.textContent = 'Thinking...';
+            log.appendChild(aLine);
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                const data = await res.json();
+                aLine.textContent = 'Agent: ' + data.answer;
+            } catch (e) {
+                aLine.textContent = 'Agent: something went wrong reaching the server.';
+            }
+            log.scrollTop = log.scrollHeight;
+        }
+
+        document.getElementById('chatInput') && document.getElementById('chatInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') askFollowup();
+        });
+    </script>
+</body>
+</html>
